@@ -1,0 +1,566 @@
+[
+  {
+    "name": "베이스 모델",
+    "accuracy": 76.66666666666667,
+    "correct": 23,
+    "total": 30,
+    "details": [
+      {
+        "question": "총 비용이 10달러를 넘는 execution을 조회해줘",
+        "gold_sql": "SELECT execution_id, SUM(cost_usd) AS total_cost FROM tool_calls GROUP BY execution_id HAVING SUM(cost_usd) > 10;",
+        "predicted_sql": "SELECT e.execution_id, e.status, e.started_at, e.ended_at, e.latency_ms, e.error_message, SUM(tc.cost_usd) AS total_cost_usd\nFROM executions e\nJOIN tool_calls tc ON e.execution_id = tc.execution_id\nGROUP BY e.execution_id\nHAVING total_cost_usd > 10;",
+        "is_correct": true
+      },
+      {
+        "question": "각 실행에서 사용된 총 input 토큰 수와 output 토큰 수를 실행 ID별로 집계해주세요",
+        "gold_sql": "SELECT execution_id, SUM(input_tokens) AS total_input_tokens, SUM(output_tokens) AS total_output_tokens FROM tool_calls GROUP BY execution_id;",
+        "predicted_sql": "SELECT execution_id, SUM(input_tokens) AS total_input_tokens, SUM(output_tokens) AS total_output_tokens\nFROM tool_calls\nGROUP BY execution_id;",
+        "is_correct": true
+      },
+      {
+        "question": "각 에이전트의 성공률(success 비율)을 계산해서 보여주세요",
+        "gold_sql": "SELECT a.agent_name, ROUND(100.0 * SUM(CASE WHEN e.status = 'success' THEN 1 ELSE 0 END) / COUNT(e.execution_id), 2) AS success_rate FROM executions e JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_name;",
+        "predicted_sql": "SELECT \n    a.agent_name, \n    (SUM(CASE WHEN e.status = 'success' THEN 1 ELSE 0 END) / COUNT(e.execution_id)) * 100 AS success_rate\nFROM \n    agents a\nJOIN \n    executions e ON a.agent_id = e.agent_id\nGROUP BY \n    a.agent_name;",
+        "is_correct": false
+      },
+      {
+        "question": "에러 메시지가 존재하는 실행 건수를 에이전트별로 보여주세요",
+        "gold_sql": "SELECT a.agent_name, COUNT(e.execution_id) AS error_count FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.error_message IS NOT NULL GROUP BY a.agent_name ORDER BY error_count DESC;",
+        "predicted_sql": "SELECT agents.agent_name, COUNT(executions.execution_id) AS error_count\nFROM agents\nJOIN executions ON agents.agent_id = executions.agent_id\nWHERE executions.error_message IS NOT NULL\nGROUP BY agents.agent_name;",
+        "is_correct": true
+      },
+      {
+        "question": "에이전트별 총 툴 호출 비용을 내림차순으로 알려주세요",
+        "gold_sql": "SELECT a.agent_name, SUM(tc.cost_usd) AS total_cost FROM tool_calls tc JOIN executions e ON tc.execution_id = e.execution_id JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_name ORDER BY total_cost DESC;",
+        "predicted_sql": "SELECT a.agent_name, SUM(tc.cost_usd) AS total_cost_usd\nFROM agents a\nJOIN executions e ON a.agent_id = e.agent_id\nJOIN tool_calls tc ON e.execution_id = tc.execution_id\nGROUP BY a.agent_name\nORDER BY total_cost_usd DESC;",
+        "is_correct": true
+      },
+      {
+        "question": "에이전트별 총 툴 호출 비용을 내림차순으로 보여주세요",
+        "gold_sql": "SELECT a.agent_name, SUM(tc.cost_usd) AS total_cost FROM tool_calls tc JOIN executions e ON tc.execution_id = e.execution_id JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_name ORDER BY total_cost DESC;",
+        "predicted_sql": "SELECT a.agent_name, SUM(tc.cost_usd) AS total_cost_usd\nFROM agents a\nJOIN executions e ON a.agent_id = e.agent_id\nJOIN tool_calls tc ON e.execution_id = tc.execution_id\nGROUP BY a.agent_name\nORDER BY total_cost_usd DESC;",
+        "is_correct": true
+      },
+      {
+        "question": "tool_calls에서 에이전트별 총 비용 합계를 내림차순으로 정렬해서 보여주세요",
+        "gold_sql": "SELECT a.agent_name, SUM(tc.cost_usd) AS total_cost FROM tool_calls tc JOIN executions e ON tc.execution_id = e.execution_id JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_name ORDER BY total_cost DESC;",
+        "predicted_sql": "SELECT t1.agent_id, SUM(t2.cost_usd) AS total_cost\nFROM agents AS t1\nJOIN tool_calls AS t2 ON t1.agent_id = t2.agent_id\nGROUP BY t1.agent_id\nORDER BY total_cost DESC;",
+        "is_correct": false
+      },
+      {
+        "question": "툴 이름별 총 비용을 보여줘",
+        "gold_sql": "SELECT tool_name, SUM(cost_usd) AS total_cost FROM tool_calls GROUP BY tool_name;",
+        "predicted_sql": "SELECT tool_name, SUM(cost_usd) AS total_cost_usd\nFROM tool_calls\nGROUP BY tool_name;",
+        "is_correct": true
+      },
+      {
+        "question": "에이전트 타입별 개수를 보여줘",
+        "gold_sql": "SELECT agent_type, COUNT(*) AS cnt FROM agents GROUP BY agent_type;",
+        "predicted_sql": "SELECT agent_type, COUNT(*) AS agent_count\nFROM agents\nGROUP BY agent_type;",
+        "is_correct": true
+      },
+      {
+        "question": "한 번의 실행에서 input_tokens 합계가 가장 높은 실행 ID를 알려줘",
+        "gold_sql": "SELECT execution_id, SUM(input_tokens) AS total_input_tokens FROM tool_calls GROUP BY execution_id ORDER BY total_input_tokens DESC LIMIT 1;",
+        "predicted_sql": "SELECT execution_id\nFROM tool_calls\nGROUP BY execution_id\nORDER BY SUM(input_tokens) DESC\nLIMIT 1;",
+        "is_correct": false
+      },
+      {
+        "question": "툴 호출이 한 번도 없었던 execution_id를 조회해줘",
+        "gold_sql": "SELECT e.execution_id FROM executions e LEFT JOIN tool_calls tc ON e.execution_id = tc.execution_id WHERE tc.tool_call_id IS NULL;",
+        "predicted_sql": "SELECT execution_id\nFROM executions\nWHERE execution_id NOT IN (SELECT execution_id FROM tool_calls);",
+        "is_correct": true
+      },
+      {
+        "question": "툴 호출을 한 번도 하지 않은 실행의 execution_id를 조회해줘",
+        "gold_sql": "SELECT e.execution_id FROM executions e LEFT JOIN tool_calls tc ON e.execution_id = tc.execution_id WHERE tc.tool_call_id IS NULL;",
+        "predicted_sql": "SELECT execution_id\nFROM executions\nWHERE execution_id NOT IN (SELECT execution_id FROM tool_calls);",
+        "is_correct": true
+      },
+      {
+        "question": "툴 호출 중 input_tokens이 1000개를 초과한 기록만 조회해줘",
+        "gold_sql": "SELECT * FROM tool_calls WHERE input_tokens > 1000;",
+        "predicted_sql": "SELECT * FROM tool_calls WHERE input_tokens > 1000;",
+        "is_correct": true
+      },
+      {
+        "question": "실행 시간이 가장 긴 execution 상위 10개를 알려주세요",
+        "gold_sql": "SELECT execution_id, agent_id, latency_ms FROM executions ORDER BY latency_ms DESC LIMIT 10;",
+        "predicted_sql": "SELECT e.execution_id, e.started_at, e.ended_at, e.latency_ms\nFROM executions e\nORDER BY e.latency_ms DESC\nLIMIT 10;",
+        "is_correct": false
+      },
+      {
+        "question": "평균 레이턴시가 가장 높은 에이전트 타입은 뭐야?",
+        "gold_sql": "SELECT a.agent_type, AVG(e.latency_ms) AS avg_latency FROM executions e JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_type ORDER BY avg_latency DESC LIMIT 1;",
+        "predicted_sql": "SELECT agent_type, AVG(latency_ms) AS avg_latency\nFROM agents\nJOIN executions ON agents.agent_id = executions.agent_id\nGROUP BY agent_type\nORDER BY avg_latency DESC\nLIMIT 1;",
+        "is_correct": true
+      },
+      {
+        "question": "에러 메시지가 있는 실행들의 에이전트 이름과 에러 내용을 보여줘",
+        "gold_sql": "SELECT a.agent_name, e.error_message, e.started_at FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.error_message IS NOT NULL;",
+        "predicted_sql": "SELECT a.agent_name, e.error_message\nFROM agents a\nJOIN executions e ON a.agent_id = e.agent_id\nWHERE e.error_message IS NOT NULL;",
+        "is_correct": true
+      },
+      {
+        "question": "각 실행별로 총 툴 호출 횟수와 총 비용을 같이 보여주세요",
+        "gold_sql": "SELECT e.execution_id, COUNT(tc.tool_call_id) AS call_count, SUM(tc.cost_usd) AS total_cost FROM executions e LEFT JOIN tool_calls tc ON e.execution_id = tc.execution_id GROUP BY e.execution_id;",
+        "predicted_sql": "SELECT \n    e.execution_id,\n    COUNT(tc.tool_call_id) AS total_tool_calls,\n    SUM(tc.cost_usd) AS total_cost_usd\nFROM \n    executions e\nLEFT JOIN \n    tool_calls tc ON e.execution_id = tc.execution_id\nGROUP BY \n    e.execution_id;",
+        "is_correct": true
+      },
+      {
+        "question": "status별 평균 latency를 보여줘",
+        "gold_sql": "SELECT status, AVG(latency_ms) AS avg_latency FROM executions GROUP BY status;",
+        "predicted_sql": "SELECT status, AVG(latency_ms) AS average_latency\nFROM executions\nGROUP BY status;",
+        "is_correct": true
+      },
+      {
+        "question": "성공한 실행의 평균 지연 시간(ms)을 에이전트별로 알려줘",
+        "gold_sql": "SELECT a.agent_name, AVG(e.latency_ms) AS avg_latency FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.status = 'success' GROUP BY a.agent_name;",
+        "predicted_sql": "SELECT a.agent_name, AVG(e.latency_ms) AS avg_latency_ms\nFROM agents a\nJOIN executions e ON a.agent_id = e.agent_id\nWHERE e.status = 'success'\nGROUP BY a.agent_name;",
+        "is_correct": true
+      },
+      {
+        "question": "성공한 실행의 평균 레이턴시를 에이전트별로 보여줘",
+        "gold_sql": "SELECT a.agent_name, AVG(e.latency_ms) AS avg_latency FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.status = 'success' GROUP BY a.agent_name;",
+        "predicted_sql": "SELECT a.agent_name, AVG(e.latency_ms) AS avg_latency_ms\nFROM agents a\nJOIN executions e ON a.agent_id = e.agent_id\nWHERE e.status = 'success'\nGROUP BY a.agent_name;",
+        "is_correct": true
+      },
+      {
+        "question": "성공한 실행의 평균 레이턴시를 에이전트 이름과 함께 보여줘",
+        "gold_sql": "SELECT a.agent_name, AVG(e.latency_ms) AS avg_latency FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.status = 'success' GROUP BY a.agent_name;",
+        "predicted_sql": "SELECT a.agent_name, AVG(e.latency_ms) AS avg_latency_ms\nFROM agents a\nJOIN executions e ON a.agent_id = e.agent_id\nWHERE e.status = 'success'\nGROUP BY a.agent_name;",
+        "is_correct": true
+      },
+      {
+        "question": "가장 많은 툴을 호출한 실행 ID 상위 5개를 알려줘",
+        "gold_sql": "SELECT execution_id, COUNT(tool_call_id) AS tool_call_count FROM tool_calls GROUP BY execution_id ORDER BY tool_call_count DESC LIMIT 5;",
+        "predicted_sql": "SELECT execution_id, COUNT(tool_call_id) AS tool_call_count\nFROM tool_calls\nGROUP BY execution_id\nORDER BY tool_call_count DESC\nLIMIT 5;",
+        "is_correct": true
+      },
+      {
+        "question": "실행 한 건당 평균 툴 호출 횟수가 가장 높은 에이전트를 알려줘",
+        "gold_sql": "SELECT a.agent_name, AVG(tc_count) AS avg_tool_calls FROM (SELECT e.execution_id, e.agent_id, COUNT(tc.tool_call_id) AS tc_count FROM executions e LEFT JOIN tool_calls tc ON e.execution_id = tc.execution_id GROUP BY e.execution_id, e.agent_id) sub JOIN agents a ON sub.agent_id = a.agent_id GROUP BY a.agent_name ORDER BY avg_tool_calls DESC LIMIT 1;",
+        "predicted_sql": "SELECT a.agent_name, AVG(tc.tool_call_id) AS avg_tool_calls\nFROM agents a\nJOIN executions e ON a.agent_id = e.agent_id\nJOIN tool_calls tc ON e.execution_id = tc.execution_id\nGROUP BY a.agent_name\nORDER BY avg_tool_calls DESC\nLIMIT 1;",
+        "is_correct": false
+      },
+      {
+        "question": "에이전트별로 가장 최근 실행 시간을 알고 싶어",
+        "gold_sql": "SELECT a.agent_name, MAX(e.started_at) AS last_executed_at FROM agents a LEFT JOIN executions e ON a.agent_id = e.agent_id GROUP BY a.agent_name;",
+        "predicted_sql": "SELECT agent_id, MAX(started_at) AS latest_execution_time\nFROM executions\nGROUP BY agent_id;",
+        "is_correct": false
+      },
+      {
+        "question": "총 비용이 1달러 이상 발생한 execution만 알려줘",
+        "gold_sql": "SELECT execution_id, SUM(cost_usd) AS total_cost FROM tool_calls GROUP BY execution_id HAVING total_cost >= 1.0;",
+        "predicted_sql": "SELECT e.execution_id, e.agent_id, e.status, e.started_at, e.ended_at, e.latency_ms, e.error_message, SUM(tc.cost_usd) AS total_cost_usd\nFROM executions e\nJOIN tool_calls tc ON e.execution_id = tc.execution_id\nGROUP BY e.execution_id\nHAVING total_cost_usd >= 1;",
+        "is_correct": false
+      },
+      {
+        "question": "평균 레이턴시가 가장 긴 상위 3개 상태를 보여줘",
+        "gold_sql": "SELECT status, AVG(latency_ms) AS avg_latency FROM executions GROUP BY status ORDER BY avg_latency DESC LIMIT 3;",
+        "predicted_sql": "SELECT status, AVG(latency_ms) AS avg_latency_ms\nFROM executions\nGROUP BY status\nORDER BY avg_latency_ms DESC\nLIMIT 3;",
+        "is_correct": true
+      },
+      {
+        "question": "가장 많이 호출된 툴 이름 순으로 전체 목록 보여줘",
+        "gold_sql": "SELECT tool_name, COUNT(*) AS call_count FROM tool_calls GROUP BY tool_name ORDER BY call_count DESC;",
+        "predicted_sql": "SELECT tool_name, COUNT(*) AS call_count\nFROM tool_calls\nGROUP BY tool_name\nORDER BY call_count DESC;",
+        "is_correct": true
+      },
+      {
+        "question": "각 툴별로 총 호출 횟수를 집계해줘",
+        "gold_sql": "SELECT tool_name, COUNT(*) AS call_count FROM tool_calls GROUP BY tool_name ORDER BY call_count DESC;",
+        "predicted_sql": "SELECT tool_name, COUNT(tool_call_id) AS total_calls\nFROM tool_calls\nGROUP BY tool_name;",
+        "is_correct": true
+      },
+      {
+        "question": "각 툴별로 총 호출 횟수를 알려줘",
+        "gold_sql": "SELECT tool_name, COUNT(*) AS call_count FROM tool_calls GROUP BY tool_name ORDER BY call_count DESC;",
+        "predicted_sql": "SELECT tool_name, COUNT(tool_call_id) AS total_calls\nFROM tool_calls\nGROUP BY tool_name;",
+        "is_correct": true
+      },
+      {
+        "question": "하루에 실행이 가장 많았던 날짜와 실행 수를 보여줘",
+        "gold_sql": "SELECT DATE(started_at) AS execution_date, COUNT(*) AS execution_count FROM executions GROUP BY DATE(started_at) ORDER BY execution_count DESC LIMIT 1;",
+        "predicted_sql": "SELECT DATE(started_at) AS date, COUNT(execution_id) AS execution_count\nFROM executions\nGROUP BY DATE(started_at)\nORDER BY execution_count DESC\nLIMIT 1;",
+        "is_correct": true
+      }
+    ]
+  },
+  {
+    "name": "iter 200",
+    "accuracy": 86.66666666666667,
+    "correct": 26,
+    "total": 30,
+    "details": [
+      {
+        "question": "총 비용이 10달러를 넘는 execution을 조회해줘",
+        "gold_sql": "SELECT execution_id, SUM(cost_usd) AS total_cost FROM tool_calls GROUP BY execution_id HAVING SUM(cost_usd) > 10;",
+        "predicted_sql": "SELECT e.execution_id, SUM(tc.cost_usd) AS total_cost FROM executions e JOIN tool_calls tc ON e.execution_id = tc.execution_id GROUP BY e.execution_id HAVING SUM(tc.cost_usd) > 10;",
+        "is_correct": true
+      },
+      {
+        "question": "각 실행에서 사용된 총 input 토큰 수와 output 토큰 수를 실행 ID별로 집계해주세요",
+        "gold_sql": "SELECT execution_id, SUM(input_tokens) AS total_input_tokens, SUM(output_tokens) AS total_output_tokens FROM tool_calls GROUP BY execution_id;",
+        "predicted_sql": "SELECT execution_id, SUM(input_tokens) AS total_input, SUM(output_tokens) AS total_output FROM tool_calls GROUP BY execution_id;",
+        "is_correct": true
+      },
+      {
+        "question": "각 에이전트의 성공률(success 비율)을 계산해서 보여주세요",
+        "gold_sql": "SELECT a.agent_name, ROUND(100.0 * SUM(CASE WHEN e.status = 'success' THEN 1 ELSE 0 END) / COUNT(e.execution_id), 2) AS success_rate FROM executions e JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_name;",
+        "predicted_sql": "SELECT a.agent_name, ROUND(SUM(CASE WHEN e.status = 'success' THEN 1.0 ELSE 0 END) / COUNT(*) * 100, 2) AS success_rate FROM executions e JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_name;",
+        "is_correct": true
+      },
+      {
+        "question": "에러 메시지가 존재하는 실행 건수를 에이전트별로 보여주세요",
+        "gold_sql": "SELECT a.agent_name, COUNT(e.execution_id) AS error_count FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.error_message IS NOT NULL GROUP BY a.agent_name ORDER BY error_count DESC;",
+        "predicted_sql": "SELECT a.agent_name, COUNT(*) AS error_count FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.error_message IS NOT NULL GROUP BY a.agent_name;",
+        "is_correct": true
+      },
+      {
+        "question": "에이전트별 총 툴 호출 비용을 내림차순으로 알려주세요",
+        "gold_sql": "SELECT a.agent_name, SUM(tc.cost_usd) AS total_cost FROM tool_calls tc JOIN executions e ON tc.execution_id = e.execution_id JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_name ORDER BY total_cost DESC;",
+        "predicted_sql": "SELECT a.agent_name, SUM(tc.cost_usd) AS total_cost FROM tool_calls tc JOIN executions e ON tc.execution_id = e.execution_id JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_name ORDER BY total_cost DESC;",
+        "is_correct": true
+      },
+      {
+        "question": "에이전트별 총 툴 호출 비용을 내림차순으로 보여주세요",
+        "gold_sql": "SELECT a.agent_name, SUM(tc.cost_usd) AS total_cost FROM tool_calls tc JOIN executions e ON tc.execution_id = e.execution_id JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_name ORDER BY total_cost DESC;",
+        "predicted_sql": "SELECT a.agent_name, SUM(tc.cost_usd) AS total_cost FROM tool_calls tc JOIN executions e ON tc.execution_id = e.execution_id JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_name ORDER BY total_cost DESC;",
+        "is_correct": true
+      },
+      {
+        "question": "tool_calls에서 에이전트별 총 비용 합계를 내림차순으로 정렬해서 보여주세요",
+        "gold_sql": "SELECT a.agent_name, SUM(tc.cost_usd) AS total_cost FROM tool_calls tc JOIN executions e ON tc.execution_id = e.execution_id JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_name ORDER BY total_cost DESC;",
+        "predicted_sql": "SELECT execution_id, SUM(cost_usd) AS total_cost FROM tool_calls GROUP BY execution_id ORDER BY total_cost DESC;",
+        "is_correct": false
+      },
+      {
+        "question": "툴 이름별 총 비용을 보여줘",
+        "gold_sql": "SELECT tool_name, SUM(cost_usd) AS total_cost FROM tool_calls GROUP BY tool_name;",
+        "predicted_sql": "SELECT tool_name, SUM(cost_usd) AS total_cost FROM tool_calls GROUP BY tool_name ORDER BY total_cost DESC;",
+        "is_correct": true
+      },
+      {
+        "question": "에이전트 타입별 개수를 보여줘",
+        "gold_sql": "SELECT agent_type, COUNT(*) AS cnt FROM agents GROUP BY agent_type;",
+        "predicted_sql": "SELECT agent_type, COUNT(*) AS agent_count FROM agents GROUP BY agent_type;",
+        "is_correct": true
+      },
+      {
+        "question": "한 번의 실행에서 input_tokens 합계가 가장 높은 실행 ID를 알려줘",
+        "gold_sql": "SELECT execution_id, SUM(input_tokens) AS total_input_tokens FROM tool_calls GROUP BY execution_id ORDER BY total_input_tokens DESC LIMIT 1;",
+        "predicted_sql": "SELECT execution_id, SUM(input_tokens) AS total_input_tokens FROM tool_calls GROUP BY execution_id ORDER BY total_input_tokens DESC LIMIT 1;",
+        "is_correct": true
+      },
+      {
+        "question": "툴 호출이 한 번도 없었던 execution_id를 조회해줘",
+        "gold_sql": "SELECT e.execution_id FROM executions e LEFT JOIN tool_calls tc ON e.execution_id = tc.execution_id WHERE tc.tool_call_id IS NULL;",
+        "predicted_sql": "SELECT e.execution_id FROM executions e LEFT JOIN tool_calls tc ON e.execution_id = tc.execution_id WHERE tc.tool_call_id IS NULL;",
+        "is_correct": true
+      },
+      {
+        "question": "툴 호출을 한 번도 하지 않은 실행의 execution_id를 조회해줘",
+        "gold_sql": "SELECT e.execution_id FROM executions e LEFT JOIN tool_calls tc ON e.execution_id = tc.execution_id WHERE tc.tool_call_id IS NULL;",
+        "predicted_sql": "SELECT e.execution_id FROM executions e LEFT JOIN tool_calls tc ON e.execution_id = tc.execution_id WHERE tc.tool_call_id IS NULL;",
+        "is_correct": true
+      },
+      {
+        "question": "툴 호출 중 input_tokens이 1000개를 초과한 기록만 조회해줘",
+        "gold_sql": "SELECT * FROM tool_calls WHERE input_tokens > 1000;",
+        "predicted_sql": "SELECT * FROM tool_calls WHERE input_tokens > 1000;",
+        "is_correct": true
+      },
+      {
+        "question": "실행 시간이 가장 긴 execution 상위 10개를 알려주세요",
+        "gold_sql": "SELECT execution_id, agent_id, latency_ms FROM executions ORDER BY latency_ms DESC LIMIT 10;",
+        "predicted_sql": "SELECT * FROM executions ORDER BY latency_ms DESC LIMIT 10;",
+        "is_correct": false
+      },
+      {
+        "question": "평균 레이턴시가 가장 높은 에이전트 타입은 뭐야?",
+        "gold_sql": "SELECT a.agent_type, AVG(e.latency_ms) AS avg_latency FROM executions e JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_type ORDER BY avg_latency DESC LIMIT 1;",
+        "predicted_sql": "SELECT a.agent_type, AVG(e.latency_ms) AS avg_latency FROM executions e JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_type ORDER BY avg_latency DESC LIMIT 1;",
+        "is_correct": true
+      },
+      {
+        "question": "에러 메시지가 있는 실행들의 에이전트 이름과 에러 내용을 보여줘",
+        "gold_sql": "SELECT a.agent_name, e.error_message, e.started_at FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.error_message IS NOT NULL;",
+        "predicted_sql": "SELECT a.agent_name, e.error_message FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.error_message IS NOT NULL;",
+        "is_correct": true
+      },
+      {
+        "question": "각 실행별로 총 툴 호출 횟수와 총 비용을 같이 보여주세요",
+        "gold_sql": "SELECT e.execution_id, COUNT(tc.tool_call_id) AS call_count, SUM(tc.cost_usd) AS total_cost FROM executions e LEFT JOIN tool_calls tc ON e.execution_id = tc.execution_id GROUP BY e.execution_id;",
+        "predicted_sql": "SELECT execution_id, COUNT(*) AS total_calls, SUM(cost_usd) AS total_cost FROM tool_calls GROUP BY execution_id;",
+        "is_correct": false
+      },
+      {
+        "question": "status별 평균 latency를 보여줘",
+        "gold_sql": "SELECT status, AVG(latency_ms) AS avg_latency FROM executions GROUP BY status;",
+        "predicted_sql": "SELECT status, AVG(latency_ms) AS avg_latency FROM executions GROUP BY status;",
+        "is_correct": true
+      },
+      {
+        "question": "성공한 실행의 평균 지연 시간(ms)을 에이전트별로 알려줘",
+        "gold_sql": "SELECT a.agent_name, AVG(e.latency_ms) AS avg_latency FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.status = 'success' GROUP BY a.agent_name;",
+        "predicted_sql": "SELECT a.agent_name, AVG(e.latency_ms) AS avg_latency_ms FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.status = 'success' GROUP BY a.agent_name;",
+        "is_correct": true
+      },
+      {
+        "question": "성공한 실행의 평균 레이턴시를 에이전트별로 보여줘",
+        "gold_sql": "SELECT a.agent_name, AVG(e.latency_ms) AS avg_latency FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.status = 'success' GROUP BY a.agent_name;",
+        "predicted_sql": "SELECT a.agent_name, AVG(e.latency_ms) AS avg_latency_ms FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.status = 'success' GROUP BY a.agent_name;",
+        "is_correct": true
+      },
+      {
+        "question": "성공한 실행의 평균 레이턴시를 에이전트 이름과 함께 보여줘",
+        "gold_sql": "SELECT a.agent_name, AVG(e.latency_ms) AS avg_latency FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.status = 'success' GROUP BY a.agent_name;",
+        "predicted_sql": "SELECT a.agent_name, AVG(e.latency_ms) AS avg_latency_ms FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.status = 'success' GROUP BY a.agent_name;",
+        "is_correct": true
+      },
+      {
+        "question": "가장 많은 툴을 호출한 실행 ID 상위 5개를 알려줘",
+        "gold_sql": "SELECT execution_id, COUNT(tool_call_id) AS tool_call_count FROM tool_calls GROUP BY execution_id ORDER BY tool_call_count DESC LIMIT 5;",
+        "predicted_sql": "SELECT execution_id, COUNT(*) AS tool_call_count FROM tool_calls GROUP BY execution_id ORDER BY tool_call_count DESC LIMIT 5;",
+        "is_correct": true
+      },
+      {
+        "question": "실행 한 건당 평균 툴 호출 횟수가 가장 높은 에이전트를 알려줘",
+        "gold_sql": "SELECT a.agent_name, AVG(tc_count) AS avg_tool_calls FROM (SELECT e.execution_id, e.agent_id, COUNT(tc.tool_call_id) AS tc_count FROM executions e LEFT JOIN tool_calls tc ON e.execution_id = tc.execution_id GROUP BY e.execution_id, e.agent_id) sub JOIN agents a ON sub.agent_id = a.agent_id GROUP BY a.agent_name ORDER BY avg_tool_calls DESC LIMIT 1;",
+        "predicted_sql": "SELECT a.agent_name, AVG(tc_count) AS avg_tool_calls FROM (SELECT e.execution_id, e.agent_id, COUNT(tc.tool_call_id) AS tc_count FROM executions e LEFT JOIN tool_calls tc ON e.execution_id = tc.execution_id GROUP BY e.execution_id, e.agent_id) sub JOIN agents a ON sub.agent_id = a.agent_id GROUP BY a.agent_name ORDER BY avg_tool_calls DESC LIMIT 1;",
+        "is_correct": true
+      },
+      {
+        "question": "에이전트별로 가장 최근 실행 시간을 알고 싶어",
+        "gold_sql": "SELECT a.agent_name, MAX(e.started_at) AS last_executed_at FROM agents a LEFT JOIN executions e ON a.agent_id = e.agent_id GROUP BY a.agent_name;",
+        "predicted_sql": "SELECT a.agent_name, MAX(e.started_at) AS last_started_at FROM executions e JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_name;",
+        "is_correct": false
+      },
+      {
+        "question": "총 비용이 1달러 이상 발생한 execution만 알려줘",
+        "gold_sql": "SELECT execution_id, SUM(cost_usd) AS total_cost FROM tool_calls GROUP BY execution_id HAVING total_cost >= 1.0;",
+        "predicted_sql": "SELECT e.execution_id, SUM(tc.cost_usd) AS total_cost FROM executions e JOIN tool_calls tc ON e.execution_id = tc.execution_id GROUP BY e.execution_id HAVING SUM(tc.cost_usd) >= 1.0;",
+        "is_correct": true
+      },
+      {
+        "question": "평균 레이턴시가 가장 긴 상위 3개 상태를 보여줘",
+        "gold_sql": "SELECT status, AVG(latency_ms) AS avg_latency FROM executions GROUP BY status ORDER BY avg_latency DESC LIMIT 3;",
+        "predicted_sql": "SELECT status, AVG(latency_ms) AS avg_latency FROM executions GROUP BY status ORDER BY avg_latency DESC LIMIT 3;",
+        "is_correct": true
+      },
+      {
+        "question": "가장 많이 호출된 툴 이름 순으로 전체 목록 보여줘",
+        "gold_sql": "SELECT tool_name, COUNT(*) AS call_count FROM tool_calls GROUP BY tool_name ORDER BY call_count DESC;",
+        "predicted_sql": "SELECT tool_name, COUNT(*) AS call_count FROM tool_calls GROUP BY tool_name ORDER BY call_count DESC;",
+        "is_correct": true
+      },
+      {
+        "question": "각 툴별로 총 호출 횟수를 집계해줘",
+        "gold_sql": "SELECT tool_name, COUNT(*) AS call_count FROM tool_calls GROUP BY tool_name ORDER BY call_count DESC;",
+        "predicted_sql": "SELECT tool_name, COUNT(*) AS total_calls FROM tool_calls GROUP BY tool_name;",
+        "is_correct": true
+      },
+      {
+        "question": "각 툴별로 총 호출 횟수를 알려줘",
+        "gold_sql": "SELECT tool_name, COUNT(*) AS call_count FROM tool_calls GROUP BY tool_name ORDER BY call_count DESC;",
+        "predicted_sql": "SELECT tool_name, COUNT(*) AS total_calls FROM tool_calls GROUP BY tool_name;",
+        "is_correct": true
+      },
+      {
+        "question": "하루에 실행이 가장 많았던 날짜와 실행 수를 보여줘",
+        "gold_sql": "SELECT DATE(started_at) AS execution_date, COUNT(*) AS execution_count FROM executions GROUP BY DATE(started_at) ORDER BY execution_count DESC LIMIT 1;",
+        "predicted_sql": "SELECT DATE(started_at) AS execution_date, COUNT(*) AS count FROM executions GROUP BY DATE(started_at) ORDER BY count DESC LIMIT 1;",
+        "is_correct": true
+      }
+    ]
+  },
+  {
+    "name": "iter 500 (최종)",
+    "accuracy": 83.33333333333334,
+    "correct": 25,
+    "total": 30,
+    "details": [
+      {
+        "question": "총 비용이 10달러를 넘는 execution을 조회해줘",
+        "gold_sql": "SELECT execution_id, SUM(cost_usd) AS total_cost FROM tool_calls GROUP BY execution_id HAVING SUM(cost_usd) > 10;",
+        "predicted_sql": "SELECT e.execution_id, e.started_at, SUM(tc.cost_usd) AS total_cost FROM executions e JOIN tool_calls tc ON e.execution_id = tc.execution_id GROUP BY e.execution_id, e.started_at HAVING SUM(tc.cost_usd) > 10;",
+        "is_correct": true
+      },
+      {
+        "question": "각 실행에서 사용된 총 input 토큰 수와 output 토큰 수를 실행 ID별로 집계해주세요",
+        "gold_sql": "SELECT execution_id, SUM(input_tokens) AS total_input_tokens, SUM(output_tokens) AS total_output_tokens FROM tool_calls GROUP BY execution_id;",
+        "predicted_sql": "SELECT execution_id, SUM(input_tokens) AS total_input_tokens, SUM(output_tokens) AS total_output_tokens FROM tool_calls GROUP BY execution_id;",
+        "is_correct": true
+      },
+      {
+        "question": "각 에이전트의 성공률(success 비율)을 계산해서 보여주세요",
+        "gold_sql": "SELECT a.agent_name, ROUND(100.0 * SUM(CASE WHEN e.status = 'success' THEN 1 ELSE 0 END) / COUNT(e.execution_id), 2) AS success_rate FROM executions e JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_name;",
+        "predicted_sql": "SELECT a.agent_name, COUNT(*) AS total, SUM(CASE WHEN e.status = 'success' THEN 1 ELSE 0 END) AS success_count, ROUND(SUM(CASE WHEN e.status = 'success' THEN 1 ELSE 0 END) * 1.0 / COUNT(*), 4) AS success_rate FROM executions e JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_name;",
+        "is_correct": false
+      },
+      {
+        "question": "에러 메시지가 존재하는 실행 건수를 에이전트별로 보여주세요",
+        "gold_sql": "SELECT a.agent_name, COUNT(e.execution_id) AS error_count FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.error_message IS NOT NULL GROUP BY a.agent_name ORDER BY error_count DESC;",
+        "predicted_sql": "SELECT a.agent_name, COUNT(*) AS error_count FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.error_message IS NOT NULL GROUP BY a.agent_name;",
+        "is_correct": true
+      },
+      {
+        "question": "에이전트별 총 툴 호출 비용을 내림차순으로 알려주세요",
+        "gold_sql": "SELECT a.agent_name, SUM(tc.cost_usd) AS total_cost FROM tool_calls tc JOIN executions e ON tc.execution_id = e.execution_id JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_name ORDER BY total_cost DESC;",
+        "predicted_sql": "SELECT a.agent_name, SUM(tc.cost_usd) AS total_cost FROM tool_calls tc JOIN executions e ON tc.execution_id = e.execution_id JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_name ORDER BY total_cost DESC;",
+        "is_correct": true
+      },
+      {
+        "question": "에이전트별 총 툴 호출 비용을 내림차순으로 보여주세요",
+        "gold_sql": "SELECT a.agent_name, SUM(tc.cost_usd) AS total_cost FROM tool_calls tc JOIN executions e ON tc.execution_id = e.execution_id JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_name ORDER BY total_cost DESC;",
+        "predicted_sql": "SELECT a.agent_name, SUM(tc.cost_usd) AS total_cost FROM tool_calls tc JOIN executions e ON tc.execution_id = e.execution_id JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_name ORDER BY total_cost DESC;",
+        "is_correct": true
+      },
+      {
+        "question": "tool_calls에서 에이전트별 총 비용 합계를 내림차순으로 정렬해서 보여주세요",
+        "gold_sql": "SELECT a.agent_name, SUM(tc.cost_usd) AS total_cost FROM tool_calls tc JOIN executions e ON tc.execution_id = e.execution_id JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_name ORDER BY total_cost DESC;",
+        "predicted_sql": "SELECT a.agent_name, SUM(tc.cost_usd) AS total_cost FROM tool_calls tc JOIN executions e ON tc.execution_id = e.execution_id JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_name ORDER BY total_cost DESC;",
+        "is_correct": true
+      },
+      {
+        "question": "툴 이름별 총 비용을 보여줘",
+        "gold_sql": "SELECT tool_name, SUM(cost_usd) AS total_cost FROM tool_calls GROUP BY tool_name;",
+        "predicted_sql": "SELECT tool_name, SUM(cost_usd) AS total_cost FROM tool_calls GROUP BY tool_name;",
+        "is_correct": true
+      },
+      {
+        "question": "에이전트 타입별 개수를 보여줘",
+        "gold_sql": "SELECT agent_type, COUNT(*) AS cnt FROM agents GROUP BY agent_type;",
+        "predicted_sql": "SELECT agent_type, COUNT(*) AS agent_count FROM agents GROUP BY agent_type;",
+        "is_correct": true
+      },
+      {
+        "question": "한 번의 실행에서 input_tokens 합계가 가장 높은 실행 ID를 알려줘",
+        "gold_sql": "SELECT execution_id, SUM(input_tokens) AS total_input_tokens FROM tool_calls GROUP BY execution_id ORDER BY total_input_tokens DESC LIMIT 1;",
+        "predicted_sql": "SELECT execution_id, SUM(input_tokens) AS total_input_tokens FROM tool_calls GROUP BY execution_id ORDER BY total_input_tokens DESC LIMIT 1;",
+        "is_correct": true
+      },
+      {
+        "question": "툴 호출이 한 번도 없었던 execution_id를 조회해줘",
+        "gold_sql": "SELECT e.execution_id FROM executions e LEFT JOIN tool_calls tc ON e.execution_id = tc.execution_id WHERE tc.tool_call_id IS NULL;",
+        "predicted_sql": "SELECT e.execution_id FROM executions e LEFT JOIN tool_calls tc ON e.execution_id = tc.execution_id WHERE tc.tool_call_id IS NULL;",
+        "is_correct": true
+      },
+      {
+        "question": "툴 호출을 한 번도 하지 않은 실행의 execution_id를 조회해줘",
+        "gold_sql": "SELECT e.execution_id FROM executions e LEFT JOIN tool_calls tc ON e.execution_id = tc.execution_id WHERE tc.tool_call_id IS NULL;",
+        "predicted_sql": "SELECT e.execution_id FROM executions e LEFT JOIN tool_calls tc ON e.execution_id = tc.execution_id WHERE tc.tool_call_id IS NULL;",
+        "is_correct": true
+      },
+      {
+        "question": "툴 호출 중 input_tokens이 1000개를 초과한 기록만 조회해줘",
+        "gold_sql": "SELECT * FROM tool_calls WHERE input_tokens > 1000;",
+        "predicted_sql": "SELECT * FROM tool_calls WHERE input_tokens > 1000;",
+        "is_correct": true
+      },
+      {
+        "question": "실행 시간이 가장 긴 execution 상위 10개를 알려주세요",
+        "gold_sql": "SELECT execution_id, agent_id, latency_ms FROM executions ORDER BY latency_ms DESC LIMIT 10;",
+        "predicted_sql": "SELECT *, (JULIANDAY(ended_at) - JULIANDAY(started_at)) * 86400 AS duration_sec FROM executions WHERE ended_at IS NOT NULL ORDER BY duration_sec DESC LIMIT 10;",
+        "is_correct": false
+      },
+      {
+        "question": "평균 레이턴시가 가장 높은 에이전트 타입은 뭐야?",
+        "gold_sql": "SELECT a.agent_type, AVG(e.latency_ms) AS avg_latency FROM executions e JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_type ORDER BY avg_latency DESC LIMIT 1;",
+        "predicted_sql": "SELECT a.agent_type, AVG(e.latency_ms) AS avg_latency FROM executions e JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_type ORDER BY avg_latency DESC LIMIT 1;",
+        "is_correct": true
+      },
+      {
+        "question": "에러 메시지가 있는 실행들의 에이전트 이름과 에러 내용을 보여줘",
+        "gold_sql": "SELECT a.agent_name, e.error_message, e.started_at FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.error_message IS NOT NULL;",
+        "predicted_sql": "SELECT a.agent_name, e.error_message FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.error_message IS NOT NULL AND e.error_message != '';",
+        "is_correct": true
+      },
+      {
+        "question": "각 실행별로 총 툴 호출 횟수와 총 비용을 같이 보여주세요",
+        "gold_sql": "SELECT e.execution_id, COUNT(tc.tool_call_id) AS call_count, SUM(tc.cost_usd) AS total_cost FROM executions e LEFT JOIN tool_calls tc ON e.execution_id = tc.execution_id GROUP BY e.execution_id;",
+        "predicted_sql": "SELECT execution_id, COUNT(*) AS total_calls, SUM(cost_usd) AS total_cost FROM tool_calls GROUP BY execution_id;",
+        "is_correct": false
+      },
+      {
+        "question": "status별 평균 latency를 보여줘",
+        "gold_sql": "SELECT status, AVG(latency_ms) AS avg_latency FROM executions GROUP BY status;",
+        "predicted_sql": "SELECT status, AVG(latency_ms) AS avg_latency FROM executions GROUP BY status;",
+        "is_correct": true
+      },
+      {
+        "question": "성공한 실행의 평균 지연 시간(ms)을 에이전트별로 알려줘",
+        "gold_sql": "SELECT a.agent_name, AVG(e.latency_ms) AS avg_latency FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.status = 'success' GROUP BY a.agent_name;",
+        "predicted_sql": "SELECT a.agent_name, AVG(e.latency_ms) AS avg_latency_ms FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.status = 'success' GROUP BY a.agent_name;",
+        "is_correct": true
+      },
+      {
+        "question": "성공한 실행의 평균 레이턴시를 에이전트별로 보여줘",
+        "gold_sql": "SELECT a.agent_name, AVG(e.latency_ms) AS avg_latency FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.status = 'success' GROUP BY a.agent_name;",
+        "predicted_sql": "SELECT a.agent_name, AVG(e.latency_ms) AS avg_latency_ms FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.status = 'success' GROUP BY a.agent_name;",
+        "is_correct": true
+      },
+      {
+        "question": "성공한 실행의 평균 레이턴시를 에이전트 이름과 함께 보여줘",
+        "gold_sql": "SELECT a.agent_name, AVG(e.latency_ms) AS avg_latency FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.status = 'success' GROUP BY a.agent_name;",
+        "predicted_sql": "SELECT a.agent_name, AVG(e.latency_ms) AS avg_latency FROM executions e JOIN agents a ON e.agent_id = a.agent_id WHERE e.status = 'success' GROUP BY a.agent_name;",
+        "is_correct": true
+      },
+      {
+        "question": "가장 많은 툴을 호출한 실행 ID 상위 5개를 알려줘",
+        "gold_sql": "SELECT execution_id, COUNT(tool_call_id) AS tool_call_count FROM tool_calls GROUP BY execution_id ORDER BY tool_call_count DESC LIMIT 5;",
+        "predicted_sql": "SELECT execution_id, COUNT(*) AS tool_call_count FROM tool_calls GROUP BY execution_id ORDER BY tool_call_count DESC LIMIT 5;",
+        "is_correct": true
+      },
+      {
+        "question": "실행 한 건당 평균 툴 호출 횟수가 가장 높은 에이전트를 알려줘",
+        "gold_sql": "SELECT a.agent_name, AVG(tc_count) AS avg_tool_calls FROM (SELECT e.execution_id, e.agent_id, COUNT(tc.tool_call_id) AS tc_count FROM executions e LEFT JOIN tool_calls tc ON e.execution_id = tc.execution_id GROUP BY e.execution_id, e.agent_id) sub JOIN agents a ON sub.agent_id = a.agent_id GROUP BY a.agent_name ORDER BY avg_tool_calls DESC LIMIT 1;",
+        "predicted_sql": "SELECT a.agent_name, COUNT(tc.tool_call_id) * 1.0 / COUNT(DISTINCT e.execution_id) AS avg_tool_calls_per_execution FROM agents a JOIN executions e ON a.agent_id = e.agent_id LEFT JOIN tool_calls tc ON e.execution_id = tc.execution_id GROUP BY a.agent_name ORDER BY avg_tool_calls_per_execution DESC LIMIT 1;",
+        "is_correct": true
+      },
+      {
+        "question": "에이전트별로 가장 최근 실행 시간을 알고 싶어",
+        "gold_sql": "SELECT a.agent_name, MAX(e.started_at) AS last_executed_at FROM agents a LEFT JOIN executions e ON a.agent_id = e.agent_id GROUP BY a.agent_name;",
+        "predicted_sql": "SELECT a.agent_name, MAX(e.started_at) AS last_execution FROM executions e JOIN agents a ON e.agent_id = a.agent_id GROUP BY a.agent_name;",
+        "is_correct": false
+      },
+      {
+        "question": "총 비용이 1달러 이상 발생한 execution만 알려줘",
+        "gold_sql": "SELECT execution_id, SUM(cost_usd) AS total_cost FROM tool_calls GROUP BY execution_id HAVING total_cost >= 1.0;",
+        "predicted_sql": "SELECT e.execution_id, e.started_at, SUM(tc.cost_usd) AS total_cost FROM executions e JOIN tool_calls tc ON e.execution_id = tc.execution_id GROUP BY e.execution_id, e.started_at HAVING SUM(tc.cost_usd) >= 1.0;",
+        "is_correct": false
+      },
+      {
+        "question": "평균 레이턴시가 가장 긴 상위 3개 상태를 보여줘",
+        "gold_sql": "SELECT status, AVG(latency_ms) AS avg_latency FROM executions GROUP BY status ORDER BY avg_latency DESC LIMIT 3;",
+        "predicted_sql": "SELECT status, AVG(latency_ms) AS avg_latency FROM executions GROUP BY status ORDER BY avg_latency DESC LIMIT 3;",
+        "is_correct": true
+      },
+      {
+        "question": "가장 많이 호출된 툴 이름 순으로 전체 목록 보여줘",
+        "gold_sql": "SELECT tool_name, COUNT(*) AS call_count FROM tool_calls GROUP BY tool_name ORDER BY call_count DESC;",
+        "predicted_sql": "SELECT tool_name, COUNT(*) AS call_count FROM tool_calls GROUP BY tool_name ORDER BY call_count DESC;",
+        "is_correct": true
+      },
+      {
+        "question": "각 툴별로 총 호출 횟수를 집계해줘",
+        "gold_sql": "SELECT tool_name, COUNT(*) AS call_count FROM tool_calls GROUP BY tool_name ORDER BY call_count DESC;",
+        "predicted_sql": "SELECT tool_name, COUNT(*) AS total_calls FROM tool_calls GROUP BY tool_name;",
+        "is_correct": true
+      },
+      {
+        "question": "각 툴별로 총 호출 횟수를 알려줘",
+        "gold_sql": "SELECT tool_name, COUNT(*) AS call_count FROM tool_calls GROUP BY tool_name ORDER BY call_count DESC;",
+        "predicted_sql": "SELECT tool_name, COUNT(*) AS total_calls FROM tool_calls GROUP BY tool_name;",
+        "is_correct": true
+      },
+      {
+        "question": "하루에 실행이 가장 많았던 날짜와 실행 수를 보여줘",
+        "gold_sql": "SELECT DATE(started_at) AS execution_date, COUNT(*) AS execution_count FROM executions GROUP BY DATE(started_at) ORDER BY execution_count DESC LIMIT 1;",
+        "predicted_sql": "SELECT DATE(started_at) AS execution_date, COUNT(*) AS count FROM executions GROUP BY DATE(started_at) ORDER BY count DESC LIMIT 1;",
+        "is_correct": true
+      }
+    ]
+  }
+]
