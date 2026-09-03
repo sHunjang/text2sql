@@ -1,0 +1,26 @@
+# ── 민감 정보 ──
+.env
+.env.*
+
+# ── Python ──
+*.pyc
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# ── macOS ──
+.DS_Store
+
+# ── 에디터 ──
+.vscode/
+.idea/
+
+# ── 학습 산출물 (용량이 커서 Git에 올리지 않고 로컬에만 보관) ──
+adapters/*.safetensors
+
+# ── 학습 로그 (재실행하면 다시 생성되는 파일이라 Git에 안 올림) ──
+notes/train_log_*.txt
+
+# ── Jupyter 노트북을 쓸 경우를 대비 ──
+.ipynb_checkpoints/
